@@ -1,0 +1,155 @@
+---
+title: "MTH6139 Time Series"
+subtitle: "Coursework 1"
+author:
+- name: Kayhnat Ilyas 200428925
+date: "March 2024"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r, echo=FALSE}
+htmltools::img(src = knitr::image_uri("QMlogo.png"), 
+               alt = 'logo', 
+               style = 'position:absolute; top:0; right:0; padding:10px; width:30%;')
+```
+
+# Time Series Analysis of UKDriverDeaths
+```{r, echo=FALSE,}
+knitr::include_graphics("crash2.gif")
+```
+
+The time series analysis of UKDriverDeaths offers insights into the historical trends and patterns of car driver fatalities and serious injuries in Great Britain from January 1969 to December 1984. This dataset offers a historical point of view on the challenges of road safety during a significant period.
+
+## My Objective
+
+My main objective is to use Meta's Prophet forecasting system to gain insights into the sequential pattern of driver fatalities and injuries. This involves understanding the underlying trends, potential seasonality and making future forecasts based on the avaliable data. These predictions can contribute to informed decision making in road safety initiatives as well as to help mitigate any risks.
+
+## Analysing the Dataset
+
+### Loading the Dataset into R
+
+We start by loading the UKDriverDeaths dataset. This dataset, containing information on car accidents in Great Britain from January 1969 to December 1984.
+
+```{r}
+library(prophet)
+data("UKDriverDeaths")
+```
+
+Prophet is quite easy to use, and also allows for additional fine tuning - which makes it suitable for analysing the UKDriverDeaths dataset.
+
+To make our data work with Meta's Prophet forecasting tool, we need to format it in a way that Prophet will recognise. So we create a dataframe with two columns:'ds' for time, and 'y' for the number of accidents.
+
+```{r}
+UKDriverDeaths.df = data.frame(
+  ds=zoo::as.yearmon(time(UKDriverDeaths)), 
+  y=UKDriverDeaths)
+model = prophet::prophet(UKDriverDeaths.df, weekly.seasonality=TRUE)
+```
+
+By including 'weekly.seasonality=TRUE' we acknowledge the potential presence of weekly patterns in the data. This may allow us to see if certain days of the week exhibit distinct trends in driver fatalities and injuries, which is crucial for a comprehensive analysis.
+
+### Visualising the data
+
+Visualizing the time series data provides insights into the historical trends and patterns of driver fatalities and injuries.
+
+```{r}
+plot(UKDriverDeaths)
+```
+
+From the graph, we can see that there is an overall downward trend in the number of deaths from the early 1970s to the mid-1980s. Additionally, there are regular fluctuations that suggest a seasonal pattern within each year.
+
+```{r}
+library(astsa)
+plot(decompose(UKDriverDeaths))
+```
+
+The trend component represents the long-term progression of the series. The trend indicates a gradual increase until about the mid-1970s, after which it seems to level off and even slightly decline. This suggests that there may be some factors that caused an increase in driver deaths - such as an increase in car usage or changes in demographic factors.
+
+The seasonal component shows that there is the pattern that repeats at regular intervals over time. The consistent peaks and troughs suggest that certain times of the year have higher incidents of driver deaths, which could be due to various seasonal factors such as weather conditions, holidays, or travel habits.
+
+The random component also known as "residuals". These are the irregularities in the data that cannot be explained by the trend or seasonal components. They may have been caused by unforeseen or random events, or they may be inherent noise in the data collection process.
+
+The decomposition helps in understanding the underlying patterns in the time series data, which is crucial for building accurate predictive models. It's clear from this decomposition that there is both a trend and a seasonal component in the original observed data, which means any forecasting models should account for these elements to predict future values reliably.
+
+### Linear Regression Analysis
+
+To further understand the growth of the series, we can run a linear regression analysis. This approach will help us to identify whether there is a consistent upward or downward movement in the series.
+
+```{r}
+UDD<-lm(y~ds, data=UKDriverDeaths.df)
+summary(UDD)
+```
+
+The coefficient estimate for ds is -28.042. This indicates the estimated change in y (driver death) for a one-unit increase in ds (time). Since this coefficient is negative, it suggests a decreasing trend in driver deaths over a period of time. Therefore suggesting that there are 28 less driver deaths per year as time goes on.
+
+The multiple R-squared value is 0.201, indicating that approximately 20.1% of the variability in deaths can be explained by the linear relationship with time.
+
+The F-statistic tests the overall significance of the model. In this case, the F-statistic is 47.81 as well as a very low p-value(6.939e-11), suggesting that the model as a whole is statistically significant.
+
+## Using Meta’s Prophet forecasting system
+
+### Creating Future Dates for Forecasting
+
+To project future trends in driver fatalities and injuries, we generate a set of dates beyond our existing dataset. We have decided to project 8 periods into the future, with the frequency set to quarters (so around 2 years). This projection horizon allows us to capture and anticipate potential shifts and patterns in the occurrence of accidents.
+
+```{r}
+future = prophet::make_future_dataframe(model, periods=8, freq="quarter")
+tail(future)
+```
+
+Using the tail function, we can check to see that the last few entries of our newly created dataframe are correctly generated.
+
+### Predictions and Visualisations
+
+In this step, we predict what our data may look like in the future.
+
+```{r}
+forecast = predict(model, future)
+tail(forecast[c('ds', 'yhat', 'yhat_lower', 'yhat_upper')])
+```
+
+Interpreting our predictions: the 'yhat' values indicate our model's best estimates for the number of deaths, while the 'yhat_lower' and 'yhat_upper' values provide a confidence interval. The wide intervals suggests there may be some uncertainty in the predictions.
+
+Next, we visualize the predicted values alongside the actual data.
+
+```{r}
+library(dygraphs)
+dyplot.prophet(model, forecast, xlab="Year", ylab="Number of Deaths")
+```
+
+The plot shows both actual and predicted values for the number of deaths over time. The black dots represent the actual number of deaths, while the blue line indicates the predicted values from Meta's Prophet forecasting model. The shaded blue area represents the confidence interval around the predictions, there by showing the potential variability and uncertainty in the forecasts.
+
+From the graph above, the predicted values show a similar directional change over time to the actual data. However, there is a notable range between the upper bound and lower bound, particularly in the troughs, which implies potential variability and uncertainty in our model's forecast.
+
+The relatively large confidence intervals could be due to the factors listed below:
+
+1.  The underlying data might have periods of increased volatility that could be difficult to predict with Meta's Prophet forecasting model.
+
+2.  There could be external influences which were not included in the model but have a significant impact on the actual numbers.
+
+### Exploring Trend and Seasonality
+
+After generating predictions, we can delve deeper into our data by visualising key components such as trends and seasonality.
+
+```{r}
+prophet_plot_components(model,forecast)
+```
+
+The top chart shows a clear downward trend over time. This trend component indicates a decrease in the number of driver deaths from 1970 to 1985. This trend component reflects the long-term progression of the series and suggests positive improvements in road safety over the years.
+
+The middle chart shows weekly seasonality; it shows fluctuations in the data by the day of the week. On Tuesday,we can see a significant dip which suggests that fewer deaths occurred on that particular day compared to the others. This weekly pattern may reflect changes in driving behaviors, traffic volume, or reporting practices throughout the week.
+
+The bottom chart shows yearly seasonality, with peaks and troughs that correspond to different times of the year. There are regular patterns suggesting that certain periods within the year consistently have higher or lower numbers of deaths. Factors such as weather conditions and holiday travel may influence these seasonal variations. 
+
+The overall downward trend in fatalities is a positive sign, indicating improvements in road safety over time. However, the presence of seasonality highlights the need for targeted safety measures and public awareness campaigns to address the predictable patterns in accident occurrences. Understanding both weekly and yearly components can help in developing effective strategies to mitigate risks and improve road safety.
+
+## Conclusion
+
+In conclusion, the time series analysis of the UKDriverDeaths dataset using Meta's Prophet forecasting system has provided valuable insights into historical trends and patterns of driver fatalities and injuries in Great Britain.
+
+```{r, echo=FALSE}
+knitr::include_graphics("crash.gif")
+```
